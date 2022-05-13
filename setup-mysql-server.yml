@@ -1,0 +1,40 @@
+---
+- name: Setup base os requirements
+  hosts: db_server
+  become: yes
+
+  tasks:
+  - name: Include variables from group_vars
+    include_vars:
+      dir: group_vars
+
+  - name: Include variables from vars
+    include_vars:
+      dir: vars
+
+  roles:
+    - role: geerlingguy.mysql
+
+  post_tasks:
+    - name: Create jpetstore databases
+      mysql_db:
+        name: "{{ jpetstore_db.name }}_{{ item.key }}"
+        encoding: utf8
+        collation: utf8_bin
+        state: present
+      loop: "{{ lookup('dict', demo_target_environment_vars) }}"
+
+    - name: Create jpetstore user
+      mysql_user:
+        name: "{{ jpetstore_db.user }}"
+        password: "{{ jpetstore_db.password }}"
+        host: "localhost"
+
+    - name: Add grant to jpetstore_db user
+      mysql_user:
+        name: "{{ jpetstore_db.user }}"
+        append_privs: yes
+        priv: "{{ jpetstore_db.name }}_{{ item.key }}.*:ALL,GRANT"
+        host: "%"
+        state: present
+      loop: "{{ lookup('dict', demo_target_environment_vars) }}"
